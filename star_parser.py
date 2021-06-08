@@ -122,7 +122,7 @@ class StarTab:
         return [list(r)[1:] for r in df.to_records()]
 
     def __repr__(self):
-        return f"StarTable {self.name} with {len(self.get_columns()) -1 } columns and {len(self.body)} record(s)"
+        return f"StarTable {self.name} with {len(self.get_columns())} columns and {len(self.body)} record(s)"
 
     def get_labels(self):
         return self.labels
