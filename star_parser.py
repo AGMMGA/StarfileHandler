@@ -332,6 +332,40 @@ class StarTab:
             self.body = self._update_body(self.df)
         return target
 
+    def substitute_string_in_column(self, pattern, new_pattern, column, store=False):
+        self.df = self.to_df()
+        if store:
+            target = self.df
+        else:
+            target = self.to_df().copy()
+        try:
+            assert column in list(target.columns)
+        except AssertionError:
+            raise AttributeError(f"There is no column named {column} in the dataframe")
+        target[column] = target[column].replace(pattern, new_pattern).astype(str)
+        if store:
+            self._update_labels(self.df.columns)
+            self.body = self._update_body(self.df)
+        return target
+
+    def apply_regex_to_column(self, pattern, new_pattern, column, store=False):
+        assert isinstance(pattern, type(re.compile("")))
+        assert isinstance(new_pattern, str)
+        self.df = self.to_df()
+        if store:
+            target = self.df
+        else:
+            target = self.to_df().copy()
+        try:
+            assert column in list(target.columns)
+        except AssertionError:
+            raise AttributeError(f"There is no column named {column} in the dataframe")
+        target[column] = pattern.sub(new_pattern, str(target[column]))
+        if store:
+            self._update_labels(self.df.columns)
+            self.body = self._update_body(self.df)
+        return target
+
     def remove_prefix_from_column(self, prefix, column, store=False):
         self.df = self.to_df()
         if store:
