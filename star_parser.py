@@ -11,8 +11,13 @@ class Hell(BaseException):
 
 
 class StarParser:
-    def __init__(self, starfile):
+    def __init__(self, starfile, create=True):
         self.file_name = Path(starfile)
+        if create:
+            try:
+                self.file_name.touch()
+            except OSError as e:
+                raise OSError(f"Cannot create file {self.file_name}") from e
         try:
             assert self.file_name.exists()
         except AssertionError as e:
@@ -86,7 +91,7 @@ class StarParser:
         self.tabs = tabs
         return tabs
 
-    def write_out(self, tabs="all"):
+    def write_out(self, tabs="all", to_file=False):
         if tabs == "all":
             requested = self.tabs
         else:
@@ -102,7 +107,22 @@ class StarParser:
         star = []
         for tab_name, tab_object in requested.items():
             star.append(tab_object.to_star())
-        return "\n".join(star)
+        if not to_file:
+            return "\n".join(star)
+        else:
+            self.file_name.write_text("\n".join(star))
+            print(f"Data written to {self.file_name}")
+
+    def read_df(self, df):
+        self.tabs = {}
+        try:
+            assert isinstance(df, pd.DataFrame)
+            self.tabs["data_"] = StarTabDf(df)
+        except AssertionError:
+            raise TypeError(
+                f"The object {df} does not appear to be a compatible pandas DataFrame"
+            )
+        return self.tabs
 
 
 class StarTab:
@@ -332,7 +352,9 @@ class StarTab:
             self.body = self._update_body(self.df)
         return target
 
-    def substitute_string_in_column(self, pattern, new_pattern, column, store=False):
+    def substitute_string_in_column_name(
+        self, pattern, new_pattern, column, store=False
+    ):
         self.df = self.to_df()
         if store:
             target = self.df
@@ -360,13 +382,15 @@ class StarTab:
             assert column in list(target.columns)
         except AssertionError:
             raise AttributeError(f"There is no column named {column} in the dataframe")
-        target[column] = pattern.sub(new_pattern, str(target[column]))
+        target[column] = target.copy()[column].str.replace(
+            pattern, new_pattern, regex=True
+        )
         if store:
             self._update_labels(self.df.columns)
             self.body = self._update_body(self.df)
         return target
 
-    def remove_prefix_from_column(self, prefix, column, store=False):
+    def remove_string_from_column_name(self, prefix, column, store=False):
         self.df = self.to_df()
         if store:
             target = self.df

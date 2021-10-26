@@ -322,15 +322,15 @@ class testStarTab(unittest.TestCase):
         with self.assertRaises(AttributeError):  # missing from input
             self.first_tab.add_prefix_to_column("prefix", "NotAColumn")
 
-    def test_remove_prefix_from_column(self):
+    def test_remove_string_from_column_name(self):
         # non permanent
-        res = self.first_tab.remove_prefix_from_column("../../", "MtfFileName")
+        res = self.first_tab.remove_string_from_column_name("../../", "MtfFileName")
         self.assertEqual(res["MtfFileName"][0], "MTF/mtf_k3_CDS_300kV_FL1.star")
         self.assertEqual(
             self.first_tab.df["MtfFileName"][0], "../../MTF/mtf_k3_CDS_300kV_FL1.star"
         )
         # permanent
-        res = self.first_tab.remove_prefix_from_column(
+        res = self.first_tab.remove_string_from_column_name(
             "../../", "MtfFileName", store=True
         )
         self.assertEqual(res["MtfFileName"][0], "MTF/mtf_k3_CDS_300kV_FL1.star")
@@ -338,9 +338,9 @@ class testStarTab(unittest.TestCase):
             self.first_tab.df["MtfFileName"][0], "MTF/mtf_k3_CDS_300kV_FL1.star"
         )
 
-    def test_remove_prefix_from_nonexisting_column(self):
+    def test_remove_string_from_nonexisting_column(self):
         with self.assertRaises(AttributeError):  # missing from input
-            self.first_tab.remove_prefix_from_column("prefix", "NotAColumn")
+            self.first_tab.remove_string_from_column_name("prefix", "NotAColumn")
 
     def test_rename_columns(self):
         old_names = ["OpticsGroupName", "OpticsGroup"]
@@ -377,6 +377,35 @@ class testStarTab(unittest.TestCase):
     def test_rename_columns_missing(self):
         with self.assertRaises(ValueError):  # first not list
             self.first_tab.rename_columns(["prefix"], ["yalla"])
+
+    def test_apply_regex_to_column(self):
+        regex = re.compile("Micrographs/")
+        pattern = "Movies/"
+        column = "MicrographName"
+        self.data_tab.apply_regex_to_column(regex, pattern, column, store=True)
+        expected = "MotionCorr/job017/Movies/FoilHole_26045257_Data_26043368_26043370_20210226_112817_fractions.mrc"
+        self.assertEqual(expected, self.data_tab.to_df()["MicrographName"][0])
+
+    def test_apply_regex_to_missing_column(self):
+        regex = re.compile("Micrographs/")
+        pattern = "Movies/"
+        column = "NotAColumn"
+        with self.assertRaises(AttributeError):
+            self.data_tab.apply_regex_to_column(regex, pattern, column, store=True)
+
+    def test_apply_regex_to_missing_column_not_a_regex(self):
+        regex = "Micrographs/"
+        pattern = "Movies/"
+        column = "NotAColumn"
+        with self.assertRaises(AssertionError):
+            self.data_tab.apply_regex_to_column(regex, pattern, column, store=True)
+
+    def test_apply_regex_to_missing_column_replacement_not_a_string(self):
+        regex = re.compile("Micrographs/")
+        pattern = re.compile("Movies/")
+        column = "NotAColumn"
+        with self.assertRaises(AssertionError):
+            self.data_tab.apply_regex_to_column(regex, pattern, column, store=True)
 
 
 exp_star = """# version 30001
