@@ -68,46 +68,68 @@ class CsParser:
     def parse_array(self):
         try:
             self.cs_array = np.load(self.cs_filename)
-        except OSError:
+        except OSError:  # not immediately obvious that this is the exception that gets raised...
             raise
-            # raise OSError(
-            #     f"The file {self.cs_filename} does not seem to be a valid cryosparc cs file"
-            # )
-        # self.columns = self.cs_array.dtype
         return self
 
-    def rename_columns(self):
-        self.column_names = []
-        # new_dtype = []
-        for key, value in enumerate(self.cs_array.dtype.fields.items()):
-            # value format: ('uid', (dtype('uint64'), 0)), i.e. (column_name, dtype tuple)
-            # we immediately rename some known useful columns
-            try:
-                # print(value)
-                # new_value = (mappings[value[0]], value[1])
-                # new_dtype.append(new_value)
-                self.column_names.append(mappings[value[0]])
-            except KeyError:  # from mappings
-                # new_dtype.append(value)
-                self.column_names.append(value[0])
-        # we re-decare the array with the new_dtype to save the updated labels
-        # self.cs_array = np.array(self.cs_array[::], dtype=new_dtype)
-        # return new_dtype
-        return self
+    def clean_array(self):
+        a = self.cs_array.copy()
+        flat_keys, multidimensional_keys = self.detect_column_dimensionality(a)
+        flattened = self.flatten_multidimensional_subarrays(a, multidimensional_keys)
+        cleaned = self.rename_array_keys(a, flat_keys)
+        return cleaned
 
-        # self.column_names = []
-        # for _, value in enumerate(self.cs_array.dtype.fields.items()):
-        #     # value format: ('uid', (dtype('uint64'), 0)), i.e. (column_name, dtype tuple)
-        #     try:
-        #         # we immediately rename some known useful columns
-        #         if mappings[value[0]]:
-        #             self.column_names.append(mappings[value[0]])
-        #         else:
-        #             self.column_names.append(value[0])
-        #     except KeyError:
-        #         # some columns might exist that are not in the mappings. We simply copy those
-        #         self.column_names.append(value)
-        return self
+    def detect_column_dimensionality(self, array):
+        # get which keys correspond to multidimensional arrays
+        dtypes = array.dtype.fields  # ('ColumnName', (dtype, dimensions))
+        multidimensional = []
+        flat = []
+        for index, value in enumerate(list(array[0])):
+            if isinstance(value, np.ndarray):  #
+                key = list(array.dtype.fields.keys())[index]
+                multidimensional.append(key)
+            else:
+                key = list(array.dtype.fields.keys())[index]
+                flat.append(key)
+        return flat, multidimensional
+
+    def flatten_multidimensional_subarrays(
+        self, parent_array, multidimensional_array_keys
+    ):
+        a = parent_array
+        # make a dataframe after flattening coordinate and angles arrays
+        mapping_coords = {0: "x", 1: "y", 2: "z"}
+        mapping_angles = {0: "alpha", 1: "beta", 2: "gamma"}
+        rascals = a[multidimensional_array_keys]
+        index_column = range(a.shape[0])
+        # make dummy index dataframe of correct size
+        reformed = pd.DataFrame(index_column)
+        for key in multidimensional_array_keys:
+            # if the name of the column is poses, they are angles;
+            # otherwise they are shifts
+            if "pose" in key:  # these are angles
+                mapping = mapping_angles
+            else:  # these are coordinates or shifts
+                mapping = mapping_coords
+            # split the array into a list of n single columns
+            split_arrays = np.hsplit(rascals[key], rascals[key].shape[-1])
+            # rename their index
+            for index, array in enumerate(split_arrays):
+                new_dtype = f"{key}_{mapping[index]}"
+                reformed[new_dtype] = pd.DataFrame(array)
+        return reformed
+
+    def rename_array_keys(self, array, keys):
+        good = array[keys]
+        df = pd.DataFrame(good)
+        new_columns = []
+        for c in df.columns:
+            if c in mappings and mappings[c]:
+                new_columns.append(mappings[c])
+            else:
+                new_columns.append(c)
+        df.columns = new_columns
+        return df
 
     def swap_coords(self, coord_x, coord_y):
         swapped_x, swapped_y = [], []
@@ -122,12 +144,9 @@ class CsParser:
 
 
 def main():
-    test_file = (
-        "/mnt/DATA/andrea/20210226_NeCen_BRCA1A_Ub/relion4/extracted_particles.cs"
-    )
+    test_file = "/mnt/DATA/andrea/20210226_NeCen_BRCA1A_Ub/relion4/P52_J977_passthrough_particles.cs"
     parser = CsParser(test_file)
     array = parser.parse_array()
-    array = array.parse_columns()
     print(array.to_df())
 
 
