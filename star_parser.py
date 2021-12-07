@@ -33,7 +33,7 @@ class StarParser:
         self.state_token = {
             "data": re.compile(".+"),
             "labels": re.compile("^_rln|loop_"),
-            "newtab": re.compile("data_"),
+            "newtab": re.compile("^data_"),
             "version": re.compile("#\sversion\s"),
         }
         self.blob = self.read_file(self.file_name)
@@ -47,17 +47,15 @@ class StarParser:
             if self.state_token[possible_state].match(line):
                 return possible_state
         raise Hell(
-            f"Current state {state} expects to be followed by {self.state_order[current_state]}"
+            f"Current state {self.state} expects to be followed by {self.state_order[current_state]}"
         )
 
     def parse(self, file_blob=None):
         if file_blob is None:
             file_blob = self.blob
         current_state = "start"
-        current_table = "data_"  # default name for a starfile single table
-        # some star files do not have a table defined - we need to define one up front and maybe
-        # substitute in a new table later once we have a name
-        tabs = {current_table: StarTab(current_table, [], [], version=None)}
+        version = ""
+        tabs = {}
         for line in file_blob:
             line = line.strip()
             if not line:
@@ -66,28 +64,18 @@ class StarParser:
                 new_state = self.check_state(line, current_state)
             except Hell as e:
                 raise NotImplemented("Format checking is not implemented yet") from e
-            if new_state == "data":
-                tabs[current_table].body.append(line.strip().split())
-            elif new_state == "labels":
-                tabs[current_table].labels.append(line)
+            if new_state == "newtab":
+                current_table = line
+                if "_general" in current_table:  # define tab beyond first
+                    tabs[current_table] = StarGeneralTab(current_table)
+                else:
+                    current_table = line
+                    tabs[current_table] = StarTab(current_table)
+                tabs[current_table].read_line(version, state="version")
             elif new_state == "version":
-                tabs[current_table].version = line
-            elif new_state == "newtab":
-                if current_table == "data_":
-                    version = tabs[
-                        current_table
-                    ].version  # version, if present, comes before table name
-                    assert not tabs[
-                        current_table
-                    ].body  # we have not parsed any table yet, we MUST be empty
-                    assert not tabs[
-                        current_table
-                    ].labels  # we have not parsed any table yet, we MUST be empty
-                    tabs = {line: StarTab(line, [], [], version=version)}
-                    current_table = line
-                else:  # define tab beyond first
-                    current_table = line
-                    tabs[current_table] = StarTab(line, [], [], version=None)
+                version = line
+            elif new_state in ["data", "labels"]:
+                tabs[current_table].read_line(line, state=new_state)
         self.tabs = tabs
         return tabs
 
@@ -126,11 +114,14 @@ class StarParser:
 
 
 class StarTab:
-    def __init__(self, name, labels, body, version=None):
-        self.body = body
-        self.labels = labels
-        self.version = version
+    def __init__(self, name):
+        self.body = []
+        self.labels = []
+        self.version = None
         self.name = name
+
+    def __repr__(self):
+        return f"StarTable {self.name} with {len(self.get_columns())} columns and {len(self.body)} record(s)"
 
     def _update_from_df(self, df):
         self.labels = self._update_labels(list(df.columns))
@@ -141,8 +132,22 @@ class StarTab:
     def _update_body(self, df):
         return [list(r)[1:] for r in df.to_records()]
 
-    def __repr__(self):
-        return f"StarTable {self.name} with {len(self.get_columns())} columns and {len(self.body)} record(s)"
+    def read_line(self, line, state):
+        if state == "data":
+            self.read_data_line(line)
+        elif state == "labels":
+            self.read_label_line(line)
+        elif state == "version":
+            self.read_version_line(line)
+
+    def read_version_line(self, line: str):
+        self.version = line
+
+    def read_data_line(self, line: str):
+        self.body.append(line.strip().split())
+
+    def read_label_line(self, line: str):
+        self.labels.append(line)
 
     def get_labels(self):
         return self.labels
@@ -234,11 +239,11 @@ class StarTab:
     def to_star(self):
         star = []
         if self.version:
-            star.append(self.version)
-        star.append(self.name)
+            star.append("\n" + self.version + "\n")
+        star.append(self.name + "\n")
         star = star + self.labels
         star = star + [" ".join(i) for i in (self.body + ["\n"])]
-        return "\n".join(star)
+        return "\n".join(star) + "\n\n"
 
     def substitute_columns(self, dataframe, store=False):
         target = self.to_df()
@@ -486,6 +491,40 @@ class StarTab:
 class StarTabDf(StarTab):
     def __init__(self, from_df):
         self._update_from_df(from_df)
+
+
+class StarGeneralTab(StarTab):
+    """
+    Deals with _general tabs, which have a different format compared to normal
+    tabs. This class is not expected to perform any data manipulation, merely helps
+    to maintain metadata consistency in complex starfiles.
+    """
+
+    def __repr__(self):
+        return f"StarTable {self.name} with {len(self.get_columns())} columns and 1 record(s)"
+
+    def read_data_line(self, line: str):
+        raise ValueError("General tabs contain no data - formatting error")
+
+    def read_label_line(self, line: str):
+        label, value = line.split()
+        self.labels.append(f"{label}")
+        self.body.append(value)
+
+    def _update_labels(self, new_columns):
+        return new_columns
+
+    def to_star(self):
+        star = []
+        if self.version:
+            star.append("\n" + self.version + "\n")
+        star.append(self.name + "\n")
+        for index, label in enumerate(self.labels):
+            # standard line length is 52, with spaces
+            value = self.body[index]
+            spaces = 52 - (len(label) + len(value))
+            star.append(f"{label}{' '*spaces}{value}")
+        return "\n".join(star) + "\n\n"
 
 
 def main():
