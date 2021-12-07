@@ -50,7 +50,7 @@ class test_parser(unittest.TestCase):
         )
         self.assertTrue(
             set(
-                [combi
+                [
                     "alignments_class_1/pose_alpha",
                     "alignments_class_1/pose_beta",
                     "alignments_class_1/pose_gamma",

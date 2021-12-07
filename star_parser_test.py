@@ -408,6 +408,81 @@ class testStarTab(unittest.TestCase):
             self.data_tab.apply_regex_to_column(regex, pattern, column, store=True)
 
 
+class testStarGeneralTab(unittest.TestCase):
+    def setUp(self):
+        working_dir = Path(os.path.abspath(__file__)).parent
+        self.starfile = working_dir / "static/run_it025_model.star"
+        self.parser = StarParser(self.starfile)
+        self.tabs = self.parser.parse()
+
+    def test_normal_init(self):
+        self.assertIn("data_model_general", self.tabs.keys())
+
+    def test_data_model_is_correct(self):
+        exp_labels = [
+            "_rlnReferenceDimensionality",
+            "_rlnDataDimensionality",
+            "_rlnOriginalImageSize",
+            "_rlnCurrentResolution",
+            "_rlnCurrentImageSize",
+            "_rlnPaddingFactor",
+            "_rlnIsHelix",
+            "_rlnFourierSpaceInterpolator",
+            "_rlnMinRadiusNnInterpolation",
+            "_rlnPixelSize",
+            "_rlnNrClasses",
+            "_rlnNrBodies",
+            "_rlnNrGroups",
+            "_rlnNrOpticsGroups",
+            "_rlnTau2FudgeFactor",
+            "_rlnNormCorrectionAverage",
+            "_rlnSigmaOffsetsAngst",
+            "_rlnOrientationalPriorMode",
+            "_rlnSigmaPriorRotAngle",
+            "_rlnSigmaPriorTiltAngle",
+            "_rlnSigmaPriorPsiAngle",
+            "_rlnLogLikelihood",
+            "_rlnAveragePmax",
+        ]
+        exp_body = [
+            "3",
+            "2",
+            "420",
+            "3.442353",
+            "216",
+            "2.000000",
+            "0",
+            "1",
+            "10",
+            "0.836000",
+            "3",
+            "1",
+            "4421",
+            "1",
+            "100.000000",
+            "0.763382",
+            "5.175344",
+            "0",
+            "0.000000",
+            "0.000000",
+            "0.000000",
+            "1.206244e+10",
+            "0.455703",
+        ]
+        self.assertEqual(self.tabs["data_model_general"].labels, exp_labels)
+        self.assertEqual(self.tabs["data_model_general"].body, exp_body)
+
+    def test_to_star(self):
+        # in starfiles that come from relion, the lines between startabs
+        # can contain a random number of spaces,that are ignored.
+        # these are not relevant. We output empty newlines.
+        res = self.tabs["data_model_general"].to_star().split("\n")[:28]
+        testfile = Path("static/run_it025_model.star")
+        exp = testfile.read_text().split("\n")[:28]
+        self.maxDiff = None
+        self.assertEqual(res, exp)
+
+
 exp_star = """# version 30001
 data_optics
 loop_
