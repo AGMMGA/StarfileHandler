@@ -79,7 +79,9 @@ class StarParser:
         self.tabs = tabs
         return tabs
 
-    def write_out(self, tabs="all", to_file=False):
+    def write_out(self, tabs="all", to_file=False, new_file=""):
+        if new_file: #seems logical
+            to_file=True
         if tabs == "all":
             requested = self.tabs
         else:
@@ -98,8 +100,12 @@ class StarParser:
         if not to_file:
             return "\n".join(star)
         else:
-            self.file_name.write_text("\n".join(star))
-            print(f"Data written to {self.file_name}")
+            if new_file:
+                destination = Path(new_file)
+            else:
+                destination = self.file_name
+            destination.write_text("\n".join(star))
+            print(f"Data written to {destination}")
 
     def read_df(self, df):
         self.tabs = {}

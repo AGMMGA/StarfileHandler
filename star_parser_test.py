@@ -482,6 +482,10 @@ class testStarGeneralTab(unittest.TestCase):
         self.maxDiff = None
         self.assertEqual(res, exp)
 
+# class testParser(unittest.TestCase):
+
+#     def test_normal(self):
+#         star_in = 
 
 exp_star = """# version 30001
 data_optics
