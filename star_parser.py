@@ -77,11 +77,11 @@ class StarParser:
             elif new_state in ["data", "labels"]:
                 tabs[current_table].read_line(line, state=new_state)
         self.tabs = tabs
-        return self
+        return tabs
 
     def write_out(self, tabs="all", to_file=False, new_file=""):
-        if new_file:  # seems logical
-            to_file = True
+        if new_file: #seems logical
+            to_file=True
         if tabs == "all":
             requested = self.tabs
         else:
@@ -117,9 +117,6 @@ class StarParser:
                 f"The object {df} does not appear to be a compatible pandas DataFrame"
             )
         return self.tabs
-
-    def __getitem__(self, i):
-        return self.tabs[i]
 
 
 class StarTab:
@@ -366,11 +363,26 @@ class StarTab:
             self.body = self._update_body(self.df)
         return target
 
-    def replace_string_in_column(
-        self, pattern, new_pattern, column, store=False, regex=False
+    def substitute_string_in_column_name(
+        self, pattern, new_pattern, column, store=False
     ):
-        if regex:
-            assert isinstance(pattern, type(re.compile("")))
+        self.df = self.to_df()
+        if store:
+            target = self.df
+        else:
+            target = self.to_df().copy()
+        try:
+            assert column in list(target.columns)
+        except AssertionError:
+            raise AttributeError(f"There is no column named {column} in the dataframe")
+        target[column] = target[column].replace(pattern, new_pattern).astype(str)
+        if store:
+            self._update_labels(self.df.columns)
+            self.body = self._update_body(self.df)
+        return target
+
+    def apply_regex_to_column(self, pattern, new_pattern, column, store=False):
+        assert isinstance(pattern, type(re.compile("")))
         assert isinstance(new_pattern, str)
         self.df = self.to_df()
         if store:
@@ -382,7 +394,7 @@ class StarTab:
         except AssertionError:
             raise AttributeError(f"There is no column named {column} in the dataframe")
         target[column] = target.copy()[column].str.replace(
-            pattern, new_pattern, regex=regex
+            pattern, new_pattern, regex=True
         )
         if store:
             self._update_labels(self.df.columns)
@@ -522,15 +534,8 @@ class StarGeneralTab(StarTab):
 
 
 def main():
-    work_folder = Path(
-        r"/mnt/DATA/sanket/SS_cryosparc_tutorial/P94/exports/jobs/P94_J295_new_local_refine/P94_J295_particles"
-    )
-    star_in = work_folder / "P94_J295_particles_exported.star"
-    assert star_in.exists()
-    parser = StarParser(star_in)
-    data = parser.parse()
-    ptcls = data["data_particles"]
-    ptcls.substitute_string_in_column_name("J", "PJ", "ImageName")
+    x = StarTabDf(pd.DataFrame({"aad": ["c"], "asda": ["a"]}))
+    print(x)
 
 
 if __name__ == "__main__":
