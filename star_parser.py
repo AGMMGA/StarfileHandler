@@ -1,9 +1,11 @@
+import os
 import re
 import sys
 
-import pandas as pd
-
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+from subprocess import Popen, PIPE
+import pandas as pd
 
 
 class Hell(BaseException):
@@ -80,8 +82,8 @@ class StarParser:
         return tabs
 
     def write_out(self, tabs="all", to_file=False, new_file=""):
-        if new_file: #seems logical
-            to_file=True
+        if new_file:  # seems logical
+            to_file = True
         if tabs == "all":
             requested = self.tabs
         else:
@@ -104,8 +106,29 @@ class StarParser:
                 destination = Path(new_file)
             else:
                 destination = self.file_name
-            destination.write_text("\n".join(star))
-            print(f"Data written to {destination}")
+        text = "\n".join(star)
+        # convert tabs to spaces using pr -e -t if in unix
+        if os.name == "posix":
+            try:
+                text = self.tabs_to_spaces(text)
+                print(f"Succesfully converted tabs to spaces")
+            except OSError:
+                print("Cannot convert tabs to spaces - reverting")
+                pass
+        print(f"Data written to {destination}")
+        destination.write_text(text)
+
+    def tabs_to_spaces(self, text):
+        with NamedTemporaryFile("w") as f:
+            f.write(text)
+            f.seek(0)
+            cmd = f"pr -e -t {f.name}".split()
+            with Popen(cmd, stdout=PIPE, stderr=PIPE) as p:
+                text_with_spaces, err = p.communicate()
+                if not err and text_with_spaces:
+                    return text_with_spaces.decode("utf-8")
+                else:
+                    raise OSError("Something went wrong using pr. Reverting")
 
     def read_df(self, df):
         self.tabs = {}
@@ -248,7 +271,7 @@ class StarTab:
             star.append("\n" + self.version + "\n")
         star.append(self.name + "\n")
         star = star + self.labels
-        star = star + [" ".join(i) for i in (self.body + ["\n"])]
+        star = star + ["\t".join(i) for i in (self.body + ["\n"])]
         return "\n".join(star) + "\n\n"
 
     def substitute_columns(self, dataframe, store=False):

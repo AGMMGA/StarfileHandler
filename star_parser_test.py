@@ -3,10 +3,27 @@ import re
 import unittest
 
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import pandas as pd
 
 from star_parser import StarParser
+
+
+class testStarParser(unittest.TestCase):
+    def setUp(self):
+        working_dir = Path(os.path.abspath(__file__)).parent
+        self.starfile = working_dir / "static/run_it025_model.star"
+        self.parser = StarParser(self.starfile)
+        self.tabs = self.parser.parse()
+
+    def test_write_out(self):
+        with NamedTemporaryFile(delete=False) as f:
+            self.parser.write_out(new_file=f.name)
+            f.seek(0)
+            output = f.read().decode("utf-8")
+        self.assertTrue("loop_" in output)
+        self.assertFalse("\t" in output)
 
 
 class testStarTab(unittest.TestCase):
@@ -482,10 +499,11 @@ class testStarGeneralTab(unittest.TestCase):
         self.maxDiff = None
         self.assertEqual(res, exp)
 
+
 # class testParser(unittest.TestCase):
 
 #     def test_normal(self):
-#         star_in = 
+#         star_in =
 
 exp_star = """# version 30001
 data_optics
